@@ -16,7 +16,6 @@ import com.songoda.ultimatecatcher.utils.EntityUtils;
 import org.bukkit.*;
 import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -121,15 +120,15 @@ public class EntityListeners implements Listener {
         Player player = event.getPlayer();
         CompatibleHand hand = CompatibleHand.getHand(event);
 
-        if (!item.hasItemMeta()) return;
-        if (event.getAction() != Action.LEFT_CLICK_BLOCK
-                && event.getAction() != Action.LEFT_CLICK_AIR
-                && event.getAction() != Action.PHYSICAL
-                && useEgg(player, item, hand)) {
+        // Toss an empty CatchEgg
+        if (useEgg(player, item, hand)) {
             event.setCancelled(true);
-        } else if (item.getItemMeta().hasDisplayName()
-                && (item.getItemMeta().getDisplayName().replace(String.valueOf(ChatColor.COLOR_CHAR), "").startsWith("UC-") || NmsManager.getNbt().of(item).has("UC"))) {
-            if (event.getAction() == Action.LEFT_CLICK_BLOCK || event.getAction() == Action.LEFT_CLICK_AIR) return;
+            return;
+        }
+
+        // Toss a filled CatchEgg to spawn a creature
+        if (NmsManager.getNbt().of(item).has("UC")) {
+
             event.setCancelled(true);
 
             if (Settings.BLOCKED_SPAWNING_WORLDS.getStringList().contains(player.getEyeLocation().getWorld().getName()) && !player.hasPermission("ultimatecatcher.bypass.blockedspawningworld")) {
@@ -143,13 +142,8 @@ public class EntityListeners implements Listener {
             nbtItem.set("UCI", true);
             ItemStack toThrow = nbtItem.finish();
 
-            Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () ->
-                    toThrow.removeEnchantment(Enchantment.ARROW_KNOCKBACK), 50);
             toThrow.setAmount(1);
             ItemUtils.setMaxStack(item, 1);
-
-            // When you see it just know it wasn't anyone on our teams idea.
-            toThrow.addUnsafeEnchantment(Enchantment.ARROW_KNOCKBACK, 69);
 
             Item egg = location.getWorld().dropItem(location, toThrow);
 
@@ -177,12 +171,8 @@ public class EntityListeners implements Listener {
         CEgg catcher = plugin.getEggManager().getEgg(
                 egg.getPersistentDataContainer().get(key, PersistentDataType.STRING));
 
-        Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () ->
-                egg.getWorld().getNearbyEntities(egg.getLocation(), 3, 3, 3).stream()
-                        .filter(entity -> entity instanceof LivingEntity
-                                && entity.getTicksLived() <= 20
-                                && entity.getType() != EntityType.PLAYER
-                                && entity.getType() == EntityType.CHICKEN).findFirst().ifPresent(Entity::remove), 0L);
+        if (catcher == null)
+            return;
 
         Entity entity = null;
 
