@@ -14,9 +14,7 @@ import com.songoda.ultimatecatcher.settings.Settings;
 import com.songoda.ultimatecatcher.tasks.EggTrackingTask;
 import com.songoda.ultimatecatcher.utils.EntityUtils;
 import org.bukkit.*;
-import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -29,6 +27,7 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
 
@@ -45,97 +44,101 @@ public class EntityListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntitySmack(PlayerInteractEntityEvent event) {
-        ItemStack item = event.getPlayer().getItemInHand();
-        if (item.getType() == Material.AIR) return;
+        ItemStack item = event.getPlayer().getInventory().getItem(event.getHand());
+        if (item.getType().equals(Material.AIR))
+            return;
 
         if (useEgg(event.getPlayer(), item, CompatibleHand.getHand(event)) || NmsManager.getNbt().of(item).has("UC"))
             event.setCancelled(true);
     }
 
     private boolean useEgg(Player player, ItemStack item, CompatibleHand hand) {
-        if (item.getItemMeta().hasDisplayName()) {
-            String name = item.getItemMeta().getDisplayName().replace(String.valueOf(ChatColor.COLOR_CHAR), "");
+        if (!NmsManager.getNbt().of(item).has("UCI"))
+            return false;
 
-            if (!NmsManager.getNbt().of(item).has("UCI")
-
-                    // Legacy Crap
-                    && !name.startsWith("UCI;") && !name.startsWith("UCI-")) return false;
-
-            if (oncePerTick.contains(player.getUniqueId())) return true;
-
-            String eggType;
-            if (NmsManager.getNbt().of(item).has("UCI")) {
-                eggType = NmsManager.getNbt().of(item).getNBTObject("type").asString();
-            } else {
-                // More legacy crap.
-                String[] split = name.split(";");
-                eggType = split.length == 3 ? split[1] : plugin.getEggManager().getFirstEgg().getKey();
-            }
-
-            Location location = player.getEyeLocation();
-            Egg egg = location.getWorld().spawn(location, Egg.class);
-            egg.setCustomName("UCI;" + eggType);
-            egg.setShooter(player);
-
-            oncePerTick.add(player.getUniqueId());
-            Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> oncePerTick.remove(player.getUniqueId()), 1L);
-
-            eggs.put(egg.getUniqueId(), player.getUniqueId());
-
-            location.getWorld().playSound(location, CompatibleSound.ENTITY_EGG_THROW.getSound(), 1L, 1L);
-
-            egg.setVelocity(player.getLocation().getDirection().normalize().multiply(2));
-
-            if (player.getGameMode() != GameMode.CREATIVE)
-                ItemUtils.takeActiveItem(player, hand);
+        if (oncePerTick.contains(player.getUniqueId()))
             return true;
-        }
 
-        return false;
+        Location location = player.getEyeLocation();
+
+        Projectile egg = location.getWorld().spawn(location, Snowball.class);
+        egg.getPersistentDataContainer().set(
+                new NamespacedKey(this.plugin, "UCI"),
+                PersistentDataType.STRING,
+                NmsManager.getNbt().of(item).getNBTObject("type").asString());
+        egg.setShooter(player);
+
+        oncePerTick.add(player.getUniqueId());
+        Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> oncePerTick.remove(player.getUniqueId()), 1L);
+
+        eggs.put(egg.getUniqueId(), player.getUniqueId());
+
+        location.getWorld().playSound(location, CompatibleSound.ENTITY_EGG_THROW.getSound(), 1L, 1L);
+
+        egg.setVelocity(player.getLocation().getDirection().normalize().multiply(2));
+
+        if (player.getGameMode() != GameMode.CREATIVE)
+            hand.takeItem(player);
+
+        return true;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void InventorySnotch(InventoryPickupItemEvent event) {
-        if (eggs.containsKey(event.getItem().getUniqueId())) event.setCancelled(true);
+        if (eggs.containsKey(event.getItem().getUniqueId()))
+            event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onStartExist(CreatureSpawnEvent event) {
         if (event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.SPAWNER_EGG
-                && event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.DISPENSE_EGG) return;
+                && event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.DISPENSE_EGG)
+            return;
 
         Entity entity = event.getEntity();
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> {
-            if (entity.getCustomName() != null && entity.getCustomName().replace(String.valueOf(ChatColor.COLOR_CHAR), "").startsWith("UC-"))
+            if (entity.getCustomName() != null
+                    && entity.getCustomName().replace(
+                    String.valueOf(ChatColor.COLOR_CHAR), "").startsWith("UC-")) {
                 entity.remove();
+            }
         }, 1L);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onToss(PlayerInteractEvent event) {
-        CompatibleHand hand = CompatibleHand.getHand(event);
+        if ( !NmsManager.getNbt().of(event.getItem()).has("UCI")
+                && event.getClickedBlock() != null
+                && event.getClickedBlock().getType().equals(Material.SPAWNER)) {
+            return;
+        }
 
-        if (event.getItem() == null
-                || event.getClickedBlock() != null
-                && event.getClickedBlock().getType() == CompatibleMaterial.SPAWNER.getMaterial()) return;
+        if (event.getAction() != Action.RIGHT_CLICK_AIR
+                    && event.getAction() != Action.RIGHT_CLICK_BLOCK)
+            return;
 
         ItemStack item = event.getItem();
         Player player = event.getPlayer();
+        CompatibleHand hand = CompatibleHand.getHand(event);
 
-        if (!item.hasItemMeta()) return;
-        if (event.getAction() != Action.LEFT_CLICK_BLOCK
-                && event.getAction() != Action.LEFT_CLICK_AIR
-                && event.getAction() != Action.PHYSICAL
-                && useEgg(player, item, hand)) {
+        // Toss an empty CatchEgg
+        if (useEgg(player, item, hand)) {
             event.setCancelled(true);
-        } else if (item.getItemMeta().hasDisplayName()
-                && (item.getItemMeta().getDisplayName().replace(String.valueOf(ChatColor.COLOR_CHAR), "").startsWith("UC-") || NmsManager.getNbt().of(item).has("UC"))) {
-            if (event.getAction() == Action.LEFT_CLICK_BLOCK || event.getAction() == Action.LEFT_CLICK_AIR) return;
+            return;
+        }
+
+        // Toss a filled CatchEgg to spawn a creature
+        if (NmsManager.getNbt().of(item).has("UC")) {
+
             event.setCancelled(true);
 
-            if (Settings.BLOCKED_SPAWNING_WORLDS.getStringList().contains(player.getEyeLocation().getWorld().getName()) && !player.hasPermission("ultimatecatcher.bypass.blockedspawningworld")) {
-                plugin.getLocale().getMessage("event.catch.blockedspawningworld").processPlaceholder("world", player.getWorld().getName()).sendPrefixedMessage(player);
+            // Spawning forbidden in this world
+            if (Settings.BLOCKED_SPAWNING_WORLDS.getStringList().contains(player.getEyeLocation().getWorld().getName())
+                    && !player.hasPermission("ultimatecatcher.bypass.blockedspawningworld")) {
+                plugin.getLocale().getMessage("event.catch.blockedspawningworld")
+                        .processPlaceholder("world", player.getWorld().getName())
+                        .sendPrefixedMessage(player);
                 return;
             }
 
@@ -145,13 +148,8 @@ public class EntityListeners implements Listener {
             nbtItem.set("UCI", true);
             ItemStack toThrow = nbtItem.finish();
 
-            Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () ->
-                    toThrow.removeEnchantment(Enchantment.ARROW_KNOCKBACK), 50);
             toThrow.setAmount(1);
             ItemUtils.setMaxStack(item, 1);
-
-            // When you see it just know it wasn't anyone on our teams idea.
-            toThrow.addUnsafeEnchantment(Enchantment.ARROW_KNOCKBACK, 69);
 
             Item egg = location.getWorld().dropItem(location, toThrow);
 
@@ -161,35 +159,28 @@ public class EntityListeners implements Listener {
 
             location.getWorld().playSound(location, CompatibleSound.ENTITY_EGG_THROW.getSound(), 1L, 1L);
 
-            egg.setVelocity(player.getLocation().getDirection().normalize().multiply(2));
+            egg.setVelocity(player.getLocation().getDirection().normalize().multiply(1));
 
+            // Finally add egg to spawner task
             EggTrackingTask.addEgg(egg);
+
             if (player.getGameMode() != GameMode.CREATIVE)
-                ItemUtils.takeActiveItem(player, hand);
+                hand.takeItem(player);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSmack(ProjectileHitEvent event) {
-        if (event.getEntity().getType() != EntityType.EGG) return;
+        NamespacedKey key = new NamespacedKey(this.plugin, "UCI");
+        if (!event.getEntity().getPersistentDataContainer().has(key, PersistentDataType.STRING))
+            return;
 
-        Egg egg = (Egg) event.getEntity();
-        if (egg.getCustomName() == null || !egg.getCustomName().startsWith("UCI") || egg.isOnGround()) return;
+        Projectile egg = event.getEntity();
+        CEgg catcher = plugin.getEggManager().getEgg(
+                egg.getPersistentDataContainer().get(key, PersistentDataType.STRING));
 
-        String[] split = egg.getCustomName().split(";");
-
-        if (split.length < 2) return;
-
-        CEgg catcher = plugin.getEggManager().getEgg(split[1]);
-
-        if (catcher == null) return;
-
-        Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () ->
-                egg.getWorld().getNearbyEntities(egg.getLocation(), 3, 3, 3).stream()
-                        .filter(entity -> entity instanceof LivingEntity
-                                && entity.getTicksLived() <= 20
-                                && entity.getType() != EntityType.PLAYER
-                                && entity.getType() == EntityType.CHICKEN).findFirst().ifPresent(Entity::remove), 0L);
+        if (catcher == null)
+            return;
 
         Entity entity = null;
 
@@ -226,8 +217,10 @@ public class EntityListeners implements Listener {
         double cost = catcher.getCost();
         Player player = offlinePlayer.getPlayer();
 
-        if (Settings.BLOCKED_CATCHING_WORLDS.getStringList().contains(player.getWorld().getName()) && !player.hasPermission("ultimatecatcher.bypass.blockedcatchingworld")) {
-            plugin.getLocale().getMessage("event.catch.blockedcatchingworld").processPlaceholder("world", player.getWorld().getName()).sendPrefixedMessage(player);
+        if (Settings.BLOCKED_CATCHING_WORLDS.getStringList().contains(player.getWorld().getName())
+                && !player.hasPermission("ultimatecatcher.bypass.blockedcatchingworld")) {
+            plugin.getLocale().getMessage("event.catch.blockedcatchingworld")
+                    .processPlaceholder("world", player.getWorld().getName()).sendPrefixedMessage(player);
             reject(egg, catcher, true);
             return;
         }
@@ -249,7 +242,8 @@ public class EntityListeners implements Listener {
             reject(egg, catcher, true);
             return;
         }
-        if (!configurationSection.getBoolean(val) && !player.hasPermission("ultimatecatcher.bypass.disabled")) {
+        if (!configurationSection.getBoolean(val)
+                && !player.hasPermission("ultimatecatcher.bypass.disabled")) {
             plugin.getLocale().getMessage("event.catch.notenabled")
                     .processPlaceholder("type", formatted).getMessage();
             reject(egg, catcher, true);
@@ -271,6 +265,7 @@ public class EntityListeners implements Listener {
             reject(egg, catcher, true);
             return;
         }
+
         int ch = catcher.getChance();
         double rand = Math.random() * 100;
         if (!(rand - ch < 0 || ch == 100) && !player.hasPermission("ultimatecatcher.bypass.chance")) {
@@ -317,13 +312,6 @@ public class EntityListeners implements Listener {
                 reject(egg, catcher, true);
                 return;
             }
-        }
-
-        PlayerInteractEvent playerInteractEvent = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, null, entity.getLocation().getBlock(), BlockFace.UP);
-        Bukkit.getPluginManager().callEvent(playerInteractEvent);
-        if (playerInteractEvent.isCancelled()) {
-            reject(egg, catcher, true);
-            return;
         }
 
         egg.remove();
@@ -406,14 +394,13 @@ public class EntityListeners implements Listener {
         entity.getWorld().playSound(entity.getLocation(), CompatibleSound.ITEM_FIRECHARGE_USE.getSound(), 1L, 1L);
     }
 
-    private void reject(Egg egg, CEgg catcher, boolean sound) {
+    private void reject(Projectile egg, CEgg catcher, boolean sound) {
         if (sound)
             egg.getWorld().playSound(egg.getLocation(), CompatibleSound.ENTITY_VILLAGER_NO.getSound(), 1L, 1L);
 
         egg.getWorld().dropItem(egg.getLocation(), catcher.toItemStack());
         egg.remove();
     }
-
 
     public Map<UUID, UUID> getEggs() {
         return eggs;

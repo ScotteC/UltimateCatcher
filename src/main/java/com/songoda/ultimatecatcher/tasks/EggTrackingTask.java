@@ -71,7 +71,6 @@ public class EggTrackingTask extends BukkitRunnable {
                 if (entity == null) {
                     plugin.getEntityListeners().getEggs().remove(item.getUniqueId());
 
-                    item.getItemStack().removeEnchantment(Enchantment.ARROW_KNOCKBACK);
                     item.setPickupDelay(1);
 
                     NBTItem newItem = NmsManager.getNbt().of(item.getItemStack());
