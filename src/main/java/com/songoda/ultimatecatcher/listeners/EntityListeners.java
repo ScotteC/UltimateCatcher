@@ -45,8 +45,9 @@ public class EntityListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntitySmack(PlayerInteractEntityEvent event) {
-        ItemStack item = event.getPlayer().getItemInHand();
-        if (item.getType() == Material.AIR) return;
+        ItemStack item = event.getPlayer().getInventory().getItem(event.getHand());
+        if (item.getType().equals(Material.AIR))
+            return;
 
         if (useEgg(event.getPlayer(), item, CompatibleHand.getHand(event)) || NmsManager.getNbt().of(item).has("UC"))
             event.setCancelled(true);
@@ -87,7 +88,7 @@ public class EntityListeners implements Listener {
             egg.setVelocity(player.getLocation().getDirection().normalize().multiply(2));
 
             if (player.getGameMode() != GameMode.CREATIVE)
-                ItemUtils.takeActiveItem(player, hand);
+            hand.takeItem(player);
             return true;
         }
 
@@ -165,7 +166,7 @@ public class EntityListeners implements Listener {
 
             EggTrackingTask.addEgg(egg);
             if (player.getGameMode() != GameMode.CREATIVE)
-                ItemUtils.takeActiveItem(player, hand);
+                hand.takeItem(player);
         }
     }
 
