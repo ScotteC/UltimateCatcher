@@ -2,7 +2,7 @@
     <groupId>com.songoda</groupId>
     <artifactId>UltimateCatcher</artifactId>
     <modelVersion>4.0.0</modelVersion>
-    <version>1.5</version>
+    <version>1.5.2</version>
     <build>
         <defaultGoal>clean install</defaultGoal>
         <finalName>UltimateCatcher-${project.version}</finalName>
@@ -89,7 +89,8 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot</artifactId>
-            <version>1.16.2</version>
+            <version>1.16.5</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.songoda</groupId>
@@ -101,6 +102,7 @@
             <groupId>net.citizensnpcs</groupId>
             <artifactId>citizens</artifactId>
             <version>2.0.26</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>
