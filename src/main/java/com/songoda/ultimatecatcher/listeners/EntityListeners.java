@@ -302,13 +302,6 @@ public class EntityListeners implements Listener {
             }
         }
 
-        PlayerInteractEvent playerInteractEvent = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, null, entity.getLocation().getBlock(), BlockFace.UP);
-        Bukkit.getPluginManager().callEvent(playerInteractEvent);
-        if (playerInteractEvent.isCancelled()) {
-            reject(egg, catcher, true);
-            return;
-        }
-
         egg.remove();
 
         CompatibleMaterial spawnEgg = CompatibleMaterial.getSpawnEgg(entity.getType());
