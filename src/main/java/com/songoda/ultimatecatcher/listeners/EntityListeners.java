@@ -107,14 +107,19 @@ public class EntityListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onToss(PlayerInteractEvent event) {
-        CompatibleHand hand = CompatibleHand.getHand(event);
+        if ( !NmsManager.getNbt().of(event.getItem()).has("UCI")
+                && event.getClickedBlock() != null
+                && event.getClickedBlock().getType().equals(Material.SPAWNER)) {
+            return;
+        }
 
-        if (event.getItem() == null
-                || event.getClickedBlock() != null
-                && event.getClickedBlock().getType() == CompatibleMaterial.SPAWNER.getMaterial()) return;
+        if (event.getAction() != Action.RIGHT_CLICK_AIR
+                    && event.getAction() != Action.RIGHT_CLICK_BLOCK)
+            return;
 
         ItemStack item = event.getItem();
         Player player = event.getPlayer();
+        CompatibleHand hand = CompatibleHand.getHand(event);
 
         if (!item.hasItemMeta()) return;
         if (event.getAction() != Action.LEFT_CLICK_BLOCK
