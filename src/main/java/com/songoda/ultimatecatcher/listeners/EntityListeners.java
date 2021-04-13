@@ -14,7 +14,6 @@ import com.songoda.ultimatecatcher.settings.Settings;
 import com.songoda.ultimatecatcher.tasks.EggTrackingTask;
 import com.songoda.ultimatecatcher.utils.EntityUtils;
 import org.bukkit.*;
-import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
@@ -69,38 +68,41 @@ public class EntityListeners implements Listener {
                 NmsManager.getNbt().of(item).getNBTObject("type").asString());
         egg.setShooter(player);
 
-            oncePerTick.add(player.getUniqueId());
-            Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> oncePerTick.remove(player.getUniqueId()), 1L);
+        oncePerTick.add(player.getUniqueId());
+        Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> oncePerTick.remove(player.getUniqueId()), 1L);
 
-            eggs.put(egg.getUniqueId(), player.getUniqueId());
+        eggs.put(egg.getUniqueId(), player.getUniqueId());
 
-            location.getWorld().playSound(location, CompatibleSound.ENTITY_EGG_THROW.getSound(), 1L, 1L);
+        location.getWorld().playSound(location, CompatibleSound.ENTITY_EGG_THROW.getSound(), 1L, 1L);
 
-            egg.setVelocity(player.getLocation().getDirection().normalize().multiply(2));
+        egg.setVelocity(player.getLocation().getDirection().normalize().multiply(2));
 
-            if (player.getGameMode() != GameMode.CREATIVE)
+        if (player.getGameMode() != GameMode.CREATIVE)
             hand.takeItem(player);
-            return true;
-        }
 
-        return false;
+        return true;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void InventorySnotch(InventoryPickupItemEvent event) {
-        if (eggs.containsKey(event.getItem().getUniqueId())) event.setCancelled(true);
+        if (eggs.containsKey(event.getItem().getUniqueId()))
+            event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onStartExist(CreatureSpawnEvent event) {
         if (event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.SPAWNER_EGG
-                && event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.DISPENSE_EGG) return;
+                && event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.DISPENSE_EGG)
+            return;
 
         Entity entity = event.getEntity();
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> {
-            if (entity.getCustomName() != null && entity.getCustomName().replace(String.valueOf(ChatColor.COLOR_CHAR), "").startsWith("UC-"))
+            if (entity.getCustomName() != null
+                    && entity.getCustomName().replace(
+                    String.valueOf(ChatColor.COLOR_CHAR), "").startsWith("UC-")) {
                 entity.remove();
+            }
         }, 1L);
     }
 
@@ -131,8 +133,12 @@ public class EntityListeners implements Listener {
 
             event.setCancelled(true);
 
-            if (Settings.BLOCKED_SPAWNING_WORLDS.getStringList().contains(player.getEyeLocation().getWorld().getName()) && !player.hasPermission("ultimatecatcher.bypass.blockedspawningworld")) {
-                plugin.getLocale().getMessage("event.catch.blockedspawningworld").processPlaceholder("world", player.getWorld().getName()).sendPrefixedMessage(player);
+            // Spawning forbidden in this world
+            if (Settings.BLOCKED_SPAWNING_WORLDS.getStringList().contains(player.getEyeLocation().getWorld().getName())
+                    && !player.hasPermission("ultimatecatcher.bypass.blockedspawningworld")) {
+                plugin.getLocale().getMessage("event.catch.blockedspawningworld")
+                        .processPlaceholder("world", player.getWorld().getName())
+                        .sendPrefixedMessage(player);
                 return;
             }
 
@@ -153,9 +159,11 @@ public class EntityListeners implements Listener {
 
             location.getWorld().playSound(location, CompatibleSound.ENTITY_EGG_THROW.getSound(), 1L, 1L);
 
-            egg.setVelocity(player.getLocation().getDirection().normalize().multiply(2));
+            egg.setVelocity(player.getLocation().getDirection().normalize().multiply(1));
 
+            // Finally add egg to spawner task
             EggTrackingTask.addEgg(egg);
+
             if (player.getGameMode() != GameMode.CREATIVE)
                 hand.takeItem(player);
         }
@@ -209,8 +217,10 @@ public class EntityListeners implements Listener {
         double cost = catcher.getCost();
         Player player = offlinePlayer.getPlayer();
 
-        if (Settings.BLOCKED_CATCHING_WORLDS.getStringList().contains(player.getWorld().getName()) && !player.hasPermission("ultimatecatcher.bypass.blockedcatchingworld")) {
-            plugin.getLocale().getMessage("event.catch.blockedcatchingworld").processPlaceholder("world", player.getWorld().getName()).sendPrefixedMessage(player);
+        if (Settings.BLOCKED_CATCHING_WORLDS.getStringList().contains(player.getWorld().getName())
+                && !player.hasPermission("ultimatecatcher.bypass.blockedcatchingworld")) {
+            plugin.getLocale().getMessage("event.catch.blockedcatchingworld")
+                    .processPlaceholder("world", player.getWorld().getName()).sendPrefixedMessage(player);
             reject(egg, catcher, true);
             return;
         }
@@ -232,7 +242,8 @@ public class EntityListeners implements Listener {
             reject(egg, catcher, true);
             return;
         }
-        if (!configurationSection.getBoolean(val) && !player.hasPermission("ultimatecatcher.bypass.disabled")) {
+        if (!configurationSection.getBoolean(val)
+                && !player.hasPermission("ultimatecatcher.bypass.disabled")) {
             plugin.getLocale().getMessage("event.catch.notenabled")
                     .processPlaceholder("type", formatted).getMessage();
             reject(egg, catcher, true);
@@ -254,6 +265,7 @@ public class EntityListeners implements Listener {
             reject(egg, catcher, true);
             return;
         }
+
         int ch = catcher.getChance();
         double rand = Math.random() * 100;
         if (!(rand - ch < 0 || ch == 100) && !player.hasPermission("ultimatecatcher.bypass.chance")) {
@@ -382,14 +394,13 @@ public class EntityListeners implements Listener {
         entity.getWorld().playSound(entity.getLocation(), CompatibleSound.ITEM_FIRECHARGE_USE.getSound(), 1L, 1L);
     }
 
-    private void reject(Egg egg, CEgg catcher, boolean sound) {
+    private void reject(Projectile egg, CEgg catcher, boolean sound) {
         if (sound)
             egg.getWorld().playSound(egg.getLocation(), CompatibleSound.ENTITY_VILLAGER_NO.getSound(), 1L, 1L);
 
         egg.getWorld().dropItem(egg.getLocation(), catcher.toItemStack());
         egg.remove();
     }
-
 
     public Map<UUID, UUID> getEggs() {
         return eggs;
